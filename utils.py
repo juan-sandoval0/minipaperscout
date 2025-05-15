@@ -5,17 +5,17 @@ from dotenv import load_dotenv
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# ---------- Embeddings ----------
+# Embeddings
 EMBED_MODEL = "text-embedding-3-small"
 
 def embed(texts: list[str]) -> np.ndarray:
-    """Return NxD numpy array of embeddings for a list of strings."""
+    #Return NxD numpy array of embeddings for a list of strings.
     resp = openai.embeddings.create(model=EMBED_MODEL, input=texts)
     return np.array([d.embedding for d in resp.data]).astype("float32")
 
-# ---------- Simple chunking ----------
+# Chunking
 def chunk(text: str, max_tokens: int = 800) -> list[str]:
-    enc = tiktoken.encoding_for_model("gpt-4o-mini")  # any encoding works
+    enc = tiktoken.encoding_for_model("gpt-4o-mini")
     tokens = enc.encode(text)
     chunks, start = [], 0
     while start < len(tokens):
@@ -24,13 +24,13 @@ def chunk(text: str, max_tokens: int = 800) -> list[str]:
         start = end
     return chunks
 
-# ---------- Time-decay scoring ----------
+# Time decay storing for papers
 def time_decay(pub_date: str, half_life_weeks: int = 12) -> float:
     """Return multiplier ∈ (0,1] given ISO publish date."""
     weeks_old = (dt.date.today() - dt.date.fromisoformat(pub_date[:10])).days / 7
     return 0.5 ** (weeks_old / half_life_weeks)
 
-# ---------- FAISS helpers ----------
+# FAISS helpers
 def build_index(vectors: np.ndarray) -> faiss.IndexFlatIP:
     index = faiss.IndexFlatIP(vectors.shape[1])
     norm = np.linalg.norm(vectors, axis=1, keepdims=True)
