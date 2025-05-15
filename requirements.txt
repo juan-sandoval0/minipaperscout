@@ -1,5 +1,5 @@
 openai>=1.13            
 requests                # fetch arXiv API JSON
-python-dotenv           # load .env
-tiktoken                # cheap token counting
-streamlit               # optional UI
+python-dotenv           
+tiktoken                
+streamlit               

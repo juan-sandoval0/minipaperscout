@@ -12,18 +12,24 @@ from utils import embed, chunk, build_index, search, time_decay
 ARXIV_API = "https://export.arxiv.org/api/query?search_query={}&sortBy=submittedDate&sortOrder=descending&max_results={}"
 
 def fetch_papers(query: str, n: int = 15) -> List[dict]:
-    q = requests.utils.quote(query)
-    xml = requests.get(ARXIV_API.format(q, n), timeout=20).text
-    # Minimal parsing: arXiv feeds are tiny; split on <entry>
+    question = requests.utils.quote(query)
+    
+    #Requesting response from arXiv
+    xml = requests.get(ARXIV_API.format(question, n), timeout=20).text
+
+    # arXiv API returns an Atom feed and they are split into entries
     entries = xml.split("<entry>")[1:]
     papers = []
+    
+    # Extract fields from each paper entry
     for e in entries:
+        #Function to get info in between tags
         get = lambda tag: (e.split(f"<{tag}>")[1].split(f"</{tag}>")[0]).strip()
         papers.append({
             "id": get("id"),
             "title": get("title").replace("\n", " "),
             "summary": get("summary").replace("\n", " "),
-            "published": get("published")[:10]
+            "published": get("published")[:10] #Truncates to show only YYYY-MM-DD
         })
     return papers
 
@@ -34,14 +40,24 @@ def build_vector_store(chunks: List[str]) -> tuple:
 
 def retrieve_evidence(papers: List[dict], user_q: str, top_k: int = 6):
     all_chunks, meta = [], []
+    # Breaking down papers into smaller chunks
     for p in papers:
         for c in chunk(p["title"] + ". " + p["summary"]):
             all_chunks.append(c)
             meta.append(p)
+    
+    #Build idex and ember user query
     index, _ = build_vector_store(all_chunks)
     q_emb = embed([user_q])
+
+    '''
+    Finds top_k most similar chunks and returns their index position 
+    and similarity score
+    '''
     idxs, sims = search(index, q_emb, top_k)
     evidence = []
+
+    #For chunks, store the text, sim score, timeliness, and paper they're in
     for i, s in zip(idxs, sims):
         p = meta[i]
         evidence.append({
@@ -50,12 +66,12 @@ def retrieve_evidence(papers: List[dict], user_q: str, top_k: int = 6):
             "decay": time_decay(p["published"]),
             "paper": p
         })
-    # re-rank by sim × decay
+    # re-rank by sim × decay, return k most useful (I choose 6)
     evidence.sort(key=lambda x: x["similarity"] * x["decay"], reverse=True)
     return evidence[:top_k]
 
 PROMPT = """
-You are Mini-PaperScout, an academic assistant.
+You are an academic assistant.
 Given a user query and a set of evidence snippets (title + abstract fragments),
 produce a concise literature brief in Markdown:
 
@@ -76,6 +92,8 @@ def generate_brief(query: str, evidence: List[dict]) -> str:
     resp = openai.chat.completions.create(model="gpt-4o-mini", messages=messages, temperature=0.2)
     return resp.choices[0].message.content
 
+# Just saving the generated brief into a markdown file + returning file path
+# I had to look up how to do this, but open to feedback on better methods!
 def save_md(content: str, query: str) -> str:
     fn = f"out/{dt.date.today()}_{query.lower().replace(' ', '_')}.md"
     pathlib.Path("out").mkdir(exist_ok=True)
@@ -93,4 +111,4 @@ if __name__ == "__main__":
     evidence = retrieve_evidence(papers, args.query, top_k=6)
     brief = generate_brief(args.query, evidence)
     path = save_md(brief, args.query)
-    print(f"✅ Brief saved to {path}")
+    print(f"Brief saved to {path}")
