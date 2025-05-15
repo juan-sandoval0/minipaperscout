@@ -78,7 +78,7 @@ produce a concise literature brief in Markdown:
 1. One-sentence overall takeaway.
 2. Bullet list of key findings (≤7 bullets).  Each bullet ends with an in-line citation [1].
 3. Paragraph “Gaps & open questions”.
-4. At bottom, full bibliography list numbered [1]–[N] with title, authors if available, arXiv link, and publication date.
+4. At bottom, full bibliography list numbered [1]-[N] with title, authors if available, arXiv link, and publication date.
 
 Strictly ground every claim to the provided snippets; do not hallucinate papers.
 """
@@ -89,7 +89,7 @@ def generate_brief(query: str, evidence: List[dict]) -> str:
         {"role": "user", "content": f"Query: {query}\n\nEvidence:\n" +
          "\n\n".join([f"<doc>{e['text']}</doc>" for e in evidence])}
     ]
-    resp = openai.chat.completions.create(model="gpt-4o-mini", messages=messages, temperature=0.2)
+    resp = openai.chat.completions.create(model="gpt-4o-mini", messages=messages, temperature=0.2) #Would recommend temp <.4
     return resp.choices[0].message.content
 
 # Just saving the generated brief into a markdown file + returning file path
